@@ -1,0 +1,500 @@
+/* Tavern Theme - Dark Medieval Aesthetic */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --tavern-dark: #1a0f0a;
+    --tavern-wood: #3d2817;
+    --tavern-wood-light: #5c3a23;
+    --tavern-gold: #d4af37;
+    --tavern-brass: #b8860b;
+    --tavern-red: #8b1a1a;
+    --tavern-green: #2d5016;
+    --tavern-parchment: #f4e8d0;
+    --tavern-shadow: rgba(0, 0, 0, 0.6);
+}
+
+body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background: var(--tavern-dark);
+    color: var(--tavern-parchment);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+#tavern-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+        radial-gradient(ellipse at top, rgba(255, 140, 0, 0.1), transparent),
+        linear-gradient(180deg, var(--tavern-dark) 0%, #0f0806 100%);
+    z-index: -1;
+}
+
+/* Screens */
+.screen {
+    display: none;
+    padding: 2rem;
+    min-height: 100vh;
+}
+
+.screen.active {
+    display: block;
+}
+
+/* Tavern Sign (Headers) */
+.tavern-sign {
+    text-align: center;
+    background: linear-gradient(135deg, var(--tavern-wood), var(--tavern-wood-light));
+    border: 4px solid var(--tavern-brass);
+    border-radius: 10px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow:
+        0 10px 30px var(--tavern-shadow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.tavern-sign h1 {
+    font-size: 3rem;
+    color: var(--tavern-gold);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    margin-bottom: 0.5rem;
+}
+
+.tavern-sign h2 {
+    font-size: 2rem;
+    color: var(--tavern-gold);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.subtitle {
+    color: var(--tavern-parchment);
+    font-style: italic;
+    font-size: 1.2rem;
+}
+
+/* Tavern Table (Container) */
+.tavern-table {
+    max-width: 600px;
+    margin: 0 auto;
+    background: var(--tavern-wood);
+    border: 3px solid var(--tavern-brass);
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 8px 24px var(--tavern-shadow);
+}
+
+/* Form Elements */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    color: var(--tavern-gold);
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+input[type="text"],
+select {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--tavern-parchment);
+    color: var(--tavern-dark);
+    border: 2px solid var(--tavern-brass);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 1rem;
+}
+
+input[type="text"]:focus,
+select:focus {
+    outline: none;
+    border-color: var(--tavern-gold);
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+}
+
+/* Buttons */
+.tavern-btn {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--tavern-brass), var(--tavern-gold));
+    color: var(--tavern-dark);
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.tavern-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(212, 175, 55, 0.4);
+}
+
+.tavern-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.tavern-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tavern-btn.secondary {
+    background: linear-gradient(135deg, #666, #888);
+}
+
+.tavern-btn.small {
+    width: auto;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    margin: 0.25rem;
+}
+
+/* Players List */
+.players-list {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+    min-height: 100px;
+}
+
+.player-item {
+    background: var(--tavern-wood-light);
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    border-left: 4px solid var(--tavern-gold);
+}
+
+/* Game Screen Layout */
+#game-screen {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    background: var(--tavern-wood);
+    border: 2px solid var(--tavern-brass);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.game-info {
+    display: flex;
+    gap: 2rem;
+}
+
+.game-info span {
+    color: var(--tavern-parchment);
+}
+
+.game-info strong {
+    color: var(--tavern-gold);
+}
+
+/* Other Players */
+.other-players {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.opponent-card {
+    background: var(--tavern-wood);
+    border: 2px solid var(--tavern-brass);
+    border-radius: 6px;
+    padding: 1rem;
+    flex: 1;
+    min-width: 200px;
+}
+
+.opponent-card.current-turn {
+    border-color: var(--tavern-gold);
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
+}
+
+.opponent-card h4 {
+    color: var(--tavern-gold);
+    margin-bottom: 0.5rem;
+}
+
+.opponent-card .stat {
+    display: flex;
+    justify-content: space-between;
+    margin: 0.25rem 0;
+}
+
+/* Game Board */
+.game-board {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    padding: 2rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+}
+
+.discard-pile {
+    text-align: center;
+}
+
+.card-back {
+    width: 120px;
+    height: 170px;
+    background: linear-gradient(135deg, var(--tavern-red), #6b1414);
+    border: 3px solid var(--tavern-brass);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tavern-gold);
+    font-weight: bold;
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 0.5rem;
+    box-shadow: 0 4px 12px var(--tavern-shadow);
+}
+
+/* Action Panel */
+.action-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+/* Player Area */
+.player-area {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 1rem;
+}
+
+.vault-section,
+.hand-section {
+    background: var(--tavern-wood);
+    border: 2px solid var(--tavern-brass);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.vault-section h3,
+.hand-section h3 {
+    color: var(--tavern-gold);
+    margin-bottom: 0.5rem;
+}
+
+.vault-type {
+    color: var(--tavern-parchment);
+    font-style: italic;
+    margin-bottom: 1rem;
+}
+
+/* Card Container */
+.card-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-height: 200px;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+}
+
+/* Cards */
+.card {
+    width: 100px;
+    height: 140px;
+    border-radius: 6px;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border: 2px solid var(--tavern-brass);
+    box-shadow: 0 2px 8px var(--tavern-shadow);
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px var(--tavern-shadow);
+}
+
+.card.selected {
+    transform: translateY(-10px);
+    border-color: var(--tavern-gold);
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.6);
+}
+
+/* Commodity Cards */
+.card.commodity {
+    background: linear-gradient(135deg, var(--tavern-parchment), #e8dcc0);
+    color: var(--tavern-dark);
+}
+
+.card.commodity.TEXTILES {
+    border-color: #6b4423;
+}
+
+.card.commodity.METALS {
+    border-color: #708090;
+}
+
+.card.commodity.SPICES {
+    border-color: #8b4513;
+}
+
+.card.commodity.JEWELRY {
+    border-color: #ffd700;
+}
+
+.card.commodity.MONSTER_PARTS {
+    border-color: #8b0000;
+}
+
+.card-name {
+    font-weight: bold;
+    font-size: 0.7rem;
+    text-align: center;
+}
+
+.card-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-align: center;
+    color: var(--tavern-brass);
+}
+
+.card-type {
+    font-size: 0.6rem;
+    text-align: center;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+
+/* Action Cards */
+.card.action {
+    background: linear-gradient(135deg, var(--tavern-red), #6b1414);
+    color: var(--tavern-gold);
+}
+
+.card-description {
+    font-size: 0.5rem;
+    text-align: center;
+    line-height: 1.2;
+}
+
+/* Modal */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--tavern-wood);
+    border: 4px solid var(--tavern-brass);
+    border-radius: 10px;
+    padding: 2rem;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px var(--tavern-shadow);
+}
+
+#modal-title {
+    color: var(--tavern-gold);
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+#modal-body {
+    margin-bottom: 1.5rem;
+    color: var(--tavern-parchment);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+/* Toast Notifications */
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--tavern-wood);
+    border: 2px solid var(--tavern-gold);
+    border-radius: 6px;
+    padding: 1rem 1.5rem;
+    color: var(--tavern-parchment);
+    box-shadow: 0 8px 24px var(--tavern-shadow);
+    transform: translateX(400px);
+    transition: transform 0.3s ease;
+    z-index: 2000;
+    max-width: 300px;
+}
+
+.toast.show {
+    transform: translateX(0);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .player-area {
+        grid-template-columns: 1fr;
+    }
+
+    .game-board {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .tavern-sign h1 {
+        font-size: 2rem;
+    }
+
+    .other-players {
+        flex-direction: column;
+    }
+
+    .card {
+        width: 80px;
+        height: 112px;
+    }
+}

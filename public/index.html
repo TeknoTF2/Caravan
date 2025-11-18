@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merchant's Caravan - Tavern Card Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="tavern-bg"></div>
+
+    <!-- Lobby Screen -->
+    <div id="lobby-screen" class="screen active">
+        <div class="tavern-sign">
+            <h1>🍺 Merchant's Caravan</h1>
+            <p class="subtitle">A Trading Card Game</p>
+        </div>
+
+        <div class="tavern-table">
+            <div class="form-group">
+                <label>Your Name:</label>
+                <input type="text" id="player-name" placeholder="Enter your name" maxlength="20">
+            </div>
+
+            <div class="form-group">
+                <label>Room Code:</label>
+                <input type="text" id="room-id" placeholder="Enter or create room code" maxlength="20">
+            </div>
+
+            <div class="form-group">
+                <label>Win Threshold (gold):</label>
+                <select id="win-threshold">
+                    <option value="250">250 - Quick Game</option>
+                    <option value="300">300 - Quick Game</option>
+                    <option value="350" selected>350 - Standard Game</option>
+                    <option value="400">400 - Standard Game</option>
+                    <option value="450">450 - Long Game</option>
+                    <option value="500">500 - Long Game</option>
+                </select>
+            </div>
+
+            <button id="join-btn" class="tavern-btn">Join Tavern</button>
+        </div>
+    </div>
+
+    <!-- Waiting Room -->
+    <div id="waiting-room" class="screen">
+        <div class="tavern-sign">
+            <h2>🏰 Waiting for Players</h2>
+            <p>Room: <span id="room-code"></span></p>
+            <p>Win Threshold: <span id="threshold-display"></span> gold</p>
+        </div>
+
+        <div class="tavern-table">
+            <div id="players-list" class="players-list"></div>
+            <button id="start-game-btn" class="tavern-btn" disabled>Start Game (need 2-4 players)</button>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen">
+        <!-- Game Header -->
+        <div class="game-header">
+            <div class="game-info">
+                <span>Round: <strong id="round-number">1</strong></span>
+                <span>Phase: <strong id="current-phase">Vault</strong></span>
+                <span>Threshold: <strong id="game-threshold">350g</strong></span>
+            </div>
+            <div class="game-info">
+                <span>Deck: <strong id="deck-size">200</strong></span>
+                <span>Current Turn: <strong id="current-player">-</strong></span>
+            </div>
+        </div>
+
+        <!-- Other Players -->
+        <div id="other-players" class="other-players"></div>
+
+        <!-- Game Board -->
+        <div class="game-board">
+            <!-- Discard Pile -->
+            <div class="discard-pile">
+                <div class="card-back">Discard Pile</div>
+                <div id="discard-top"></div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-panel">
+                <div id="phase-actions"></div>
+            </div>
+        </div>
+
+        <!-- Player's Area -->
+        <div class="player-area">
+            <!-- Vault -->
+            <div class="vault-section">
+                <h3>Your Vault (<span id="vault-count">0</span>)</h3>
+                <div class="vault-type">Type: <span id="vault-type">Not Set</span></div>
+                <div id="player-vault" class="card-container"></div>
+            </div>
+
+            <!-- Hand -->
+            <div class="hand-section">
+                <h3>Your Hand (<span id="hand-count">0</span>/12)</h3>
+                <div id="player-hand" class="card-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay">
+        <div id="modal-content" class="modal-content">
+            <h2 id="modal-title"></h2>
+            <div id="modal-body"></div>
+            <div class="modal-actions">
+                <button id="modal-confirm" class="tavern-btn">Confirm</button>
+                <button id="modal-cancel" class="tavern-btn secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="screen">
+        <div class="tavern-sign">
+            <h1 id="winner-announcement"></h1>
+        </div>
+        <div class="tavern-table">
+            <div id="winner-details"></div>
+            <button onclick="location.reload()" class="tavern-btn">Return to Lobby</button>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game-client.js"></script>
+</body>
+</html>
