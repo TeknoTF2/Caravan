@@ -1,7 +1,34 @@
 # Caravan
 Custom TTRPG card game
-MERCHANT'S CARAVAN
-A Competitive Trading Card Game for 2-4 Players
+
+## 🍺 Play Online
+
+This game is now available as a **multiplayer web application** with a tavern-style aesthetic!
+
+### Quick Start
+1. Install dependencies: `npm install`
+2. Start the server: `npm start`
+3. Open your browser to `http://localhost:3000`
+4. Create or join a room with friends
+5. Start playing!
+
+### Deployment on Render
+1. Push this repository to GitHub
+2. Create a new Web Service on Render
+3. Connect your repository
+4. Render will automatically detect the Node.js app
+5. The server will run on the PORT environment variable
+
+### How to Play Online
+1. Enter your name and create a unique room code (or join an existing room)
+2. Share the room code with 1-4 friends
+3. Once 2-5 players have joined, any player can start the game
+4. Follow the on-screen instructions for each phase
+
+---
+
+## MERCHANT'S CARAVAN
+A Competitive Trading Card Game for 2-5 Players
 
 GAME OVERVIEW
 Merchant's Caravan is a cutthroat trading game where players compete to build the most valuable caravan by collecting commodity cards through drawing, trading, and theft. Players must carefully balance what they keep in hand versus what they secure in their vault, all while deducing what opponents are building.
