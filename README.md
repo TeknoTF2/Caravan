@@ -21,14 +21,14 @@ This game is now available as a **multiplayer web application** with a tavern-st
 
 ### How to Play Online
 1. Enter your name and create a unique room code (or join an existing room)
-2. Share the room code with 1-3 friends
-3. Once 2-4 players have joined, any player can start the game
+2. Share the room code with 1-4 friends
+3. Once 2-5 players have joined, any player can start the game
 4. Follow the on-screen instructions for each phase
 
 ---
 
 ## MERCHANT'S CARAVAN
-A Competitive Trading Card Game for 2-4 Players
+A Competitive Trading Card Game for 2-5 Players
 
 GAME OVERVIEW
 Merchant's Caravan is a cutthroat trading game where players compete to build the most valuable caravan by collecting commodity cards through drawing, trading, and theft. Players must carefully balance what they keep in hand versus what they secure in their vault, all while deducing what opponents are building.

@@ -15,7 +15,7 @@ class Game {
   }
 
   addPlayer(playerId, playerName) {
-    if (this.players.length >= 4) {
+    if (this.players.length >= 5) {
       return { success: false, message: 'Room is full' };
     }
 

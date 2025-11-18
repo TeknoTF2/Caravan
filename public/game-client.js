@@ -118,12 +118,12 @@ function updateWaitingRoom(state) {
         playersList.appendChild(playerItem);
     });
 
-    if (state.players.length >= 2 && state.players.length <= 4) {
+    if (state.players.length >= 2 && state.players.length <= 5) {
         startBtn.disabled = false;
         startBtn.textContent = `Start Game (${state.players.length} players)`;
     } else {
         startBtn.disabled = true;
-        startBtn.textContent = `Start Game (need 2-4 players)`;
+        startBtn.textContent = `Start Game (need 2-5 players)`;
     }
 }
 
