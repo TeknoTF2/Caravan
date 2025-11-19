@@ -381,6 +381,8 @@ socket.on('cardsDrawn', (data) => {
     gameState = data.gameState;
     updateGameUI();
     showToast(`Drew ${data.cards.length} cards`);
+    // Force re-render of action panel to prevent soft-lock
+    setTimeout(() => updateActionPanel(), 100);
 });
 
 // Handle play action
@@ -398,24 +400,189 @@ function handlePlayAction() {
     }
 
     // Handle different action types
-    if (card.name === 'Thief' || card.name === 'Fire' || card.name === 'Audit') {
-        selectTargetPlayer((targetId) => {
-            socket.emit('playAction', { cardId: card.id, targetPlayerId: targetId });
-            selectedCards = [];
-        });
-    } else if (card.name === 'Smuggler') {
-        socket.emit('playAction', { cardId: card.id });
-        selectedCards = [];
-    } else if (card.name === 'Fence') {
-        // Fence requires selecting one from hand and one from vault
-        showToast('Fence: Select 1 card from vault and 1 from hand, then play again');
-        // Simplified for now
-        socket.emit('playAction', { cardId: card.id });
-        selectedCards = [];
-    } else {
-        socket.emit('playAction', { cardId: card.id });
-        selectedCards = [];
+    switch (card.name) {
+        case 'Thief':
+            handleThiefCard(card);
+            break;
+        case 'Fire':
+            handleFireCard(card);
+            break;
+        case 'Smuggler':
+            handleSmugglerCard(card);
+            break;
+        case 'Audit':
+            handleAuditCard(card);
+            break;
+        case 'Fence':
+            handleFenceCard(card);
+            break;
+        case 'Market Day':
+            handleMarketDayCard(card);
+            break;
+        case 'Tax Day':
+            handleTaxDayCard(card);
+            break;
+        default:
+            showToast('Unknown action card');
     }
+}
+
+// Thief: Target player shuffles hand, you randomly steal 1 card
+function handleThiefCard(card) {
+    selectTargetPlayer((targetId) => {
+        showModal(
+            'Playing Thief',
+            `<p>You will randomly steal 1 card from the target player's hand.</p><p>Continue?</p>`,
+            () => {
+                socket.emit('playAction', {
+                    cardId: card.id,
+                    targetPlayerId: targetId,
+                    actionType: 'thief'
+                });
+                selectedCards = [];
+            },
+            () => selectedCards = []
+        );
+    });
+}
+
+// Fire: Target player discards 2 cards
+function handleFireCard(card) {
+    selectTargetPlayer((targetId) => {
+        showModal(
+            'Playing Fire',
+            `<p>Target player will discard 2 cards of their choice.</p><p>Continue?</p>`,
+            () => {
+                socket.emit('playAction', {
+                    cardId: card.id,
+                    targetPlayerId: targetId,
+                    actionType: 'fire'
+                });
+                selectedCards = [];
+            },
+            () => selectedCards = []
+        );
+    });
+}
+
+// Smuggler: Draw 3 cards, then discard 1
+function handleSmugglerCard(card) {
+    showModal(
+        'Playing Smuggler',
+        `<p>You will draw 3 cards, then choose 1 card to discard.</p><p>Continue?</p>`,
+        () => {
+            socket.emit('playAction', {
+                cardId: card.id,
+                actionType: 'smuggler'
+            });
+            selectedCards = [];
+        },
+        () => selectedCards = []
+    );
+}
+
+// Audit: Look at target player's hand
+function handleAuditCard(card) {
+    selectTargetPlayer((targetId) => {
+        socket.emit('playAction', {
+            cardId: card.id,
+            targetPlayerId: targetId,
+            actionType: 'audit'
+        });
+        selectedCards = [];
+    });
+}
+
+// Fence: Swap 1 vault card with 1 hand card
+function handleFenceCard(card) {
+    showModal(
+        'Playing Fence',
+        `<p><strong>Step 1:</strong> Select 1 card from your VAULT</p>
+         <p><strong>Step 2:</strong> Select 1 card from your HAND</p>
+         <p><strong>Step 3:</strong> Click Confirm to swap them</p>
+         <p>Select your cards now, then click Confirm when ready.</p>`,
+        () => {
+            if (selectedCards.length !== 2) {
+                showToast('You must select exactly 2 cards (1 from vault, 1 from hand)');
+                return;
+            }
+
+            const player = gameState.players.find(p => p.id === currentPlayerId);
+            const vaultCardIds = player.vault.map(c => c.id);
+            const handCardIds = player.hand.map(c => c.id);
+
+            const vaultCard = selectedCards.find(c => vaultCardIds.includes(c.id));
+            const handCard = selectedCards.find(c => handCardIds.includes(c.id));
+
+            if (!vaultCard || !handCard) {
+                showToast('Select 1 card from vault AND 1 card from hand');
+                return;
+            }
+
+            socket.emit('playAction', {
+                cardId: card.id,
+                actionType: 'fence',
+                data: {
+                    vaultCardId: vaultCard.id,
+                    handCardId: handCard.id
+                }
+            });
+            selectedCards = [];
+        },
+        () => selectedCards = []
+    );
+}
+
+// Market Day: Auction system
+function handleMarketDayCard(card) {
+    showModal(
+        'Playing Market Day',
+        `<p>All players will simultaneously reveal 1 card from their hand.</p>
+         <p>Cards will be auctioned one at a time.</p>
+         <p><strong>Select 1 card from your hand to reveal</strong></p>`,
+        () => {
+            if (selectedCards.length !== 1) {
+                showToast('Select exactly 1 card to reveal');
+                return;
+            }
+
+            socket.emit('playAction', {
+                cardId: card.id,
+                actionType: 'marketDay',
+                data: {
+                    revealedCardId: selectedCards[0].id
+                }
+            });
+            selectedCards = [];
+        },
+        () => selectedCards = []
+    );
+}
+
+// Tax Day: All discard 2, redistribute
+function handleTaxDayCard(card) {
+    showModal(
+        'Playing Tax Day',
+        `<p>All players will discard 2 cards.</p>
+         <p>All discarded cards will be shuffled and redistributed evenly.</p>
+         <p><strong>Select 2 cards from your hand to discard</strong></p>`,
+        () => {
+            if (selectedCards.length !== 2) {
+                showToast('Select exactly 2 cards to discard');
+                return;
+            }
+
+            socket.emit('playAction', {
+                cardId: card.id,
+                actionType: 'taxDay',
+                data: {
+                    discardedCardIds: selectedCards.map(c => c.id)
+                }
+            });
+            selectedCards = [];
+        },
+        () => selectedCards = []
+    );
 }
 
 // Select target player
@@ -442,12 +609,96 @@ function selectTargetPlayer(callback) {
 // Socket event: Action played
 socket.on('actionPlayed', (data) => {
     showToast(`${data.playerName} played ${data.card.name}`);
+});
 
-    // Handle specific actions
-    if (data.card.name === 'Smuggler' && data.playerId === currentPlayerId) {
-        // Draw 3 cards (server handles this)
-        showToast('Draw 3 cards, then discard 1');
-    }
+// Socket event: Card stolen (Thief victim)
+socket.on('cardStolen', (data) => {
+    showToast(`${data.byPlayer} stole a card from you!`);
+});
+
+// Socket event: Card received (Thief player)
+socket.on('cardReceived', (data) => {
+    showToast(`You stole ${data.card.name} from ${data.fromPlayer}!`);
+});
+
+// Socket event: Must discard (Fire victim)
+socket.on('mustDiscard', (data) => {
+    showModal(
+        'Fire Card Effect',
+        `<p>${data.reason}</p><p>Select ${data.count} cards to discard</p>`,
+        () => {
+            if (selectedCards.length !== data.count) {
+                showToast(`Select exactly ${data.count} cards`);
+                return;
+            }
+
+            socket.emit('discardCards', {
+                cardIds: selectedCards.map(c => c.id)
+            });
+            selectedCards = [];
+        }
+    );
+});
+
+// Socket event: Smuggler drawn cards
+socket.on('smugglerDrawn', (data) => {
+    gameState.players.find(p => p.id === currentPlayerId).hand.push(...data.cards);
+    updateGameUI();
+
+    showModal(
+        'Smuggler Effect',
+        `<p>You drew ${data.cards.length} cards!</p><p>Now select ${data.mustDiscard} card to discard</p>`,
+        () => {
+            if (selectedCards.length !== data.mustDiscard) {
+                showToast(`Select exactly ${data.mustDiscard} card`);
+                return;
+            }
+
+            socket.emit('discardCards', {
+                cardIds: selectedCards.map(c => c.id)
+            });
+            selectedCards = [];
+        }
+    );
+});
+
+// Socket event: Audit result
+socket.on('auditResult', (data) => {
+    let cardsHTML = '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">';
+
+    data.hand.forEach(card => {
+        if (card.type === 'commodity') {
+            cardsHTML += `
+                <div class="card commodity ${card.caravanType}" style="width: 80px; height: 112px;">
+                    <div class="card-name">${card.name}</div>
+                    <div class="card-value">${card.value}g</div>
+                    <div class="card-type">${card.caravanType.replace('_', ' ')}</div>
+                </div>`;
+        } else {
+            cardsHTML += `
+                <div class="card action" style="width: 80px; height: 112px;">
+                    <div class="card-name">${card.name}</div>
+                </div>`;
+        }
+    });
+
+    cardsHTML += '</div>';
+
+    showModal(
+        `Audit: ${data.targetPlayer}'s Hand`,
+        cardsHTML,
+        () => {}
+    );
+});
+
+// Socket event: Tax Day started
+socket.on('taxDayStarted', (data) => {
+    showToast(`${data.initiator} played Tax Day! (Note: Manual implementation - all players discard 2 cards)`);
+});
+
+// Socket event: Market Day started
+socket.on('marketDayStarted', (data) => {
+    showToast(`${data.initiator} played Market Day! (Note: Manual implementation - reveal and auction cards)`);
 });
 
 // Handle trade
