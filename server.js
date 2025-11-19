@@ -264,6 +264,7 @@ io.on('connection', (socket) => {
         break;
 
       case 'taxDay':
+        game.startTaxDay();
         io.to(currentRoom).emit('taxDayStarted', {
           initiator: player.name
         });
@@ -312,6 +313,42 @@ io.on('connection', (socket) => {
         playerId: socket.id,
         count: cardIds.length
       });
+    } else {
+      socket.emit('error', { message: result.message });
+    }
+  });
+
+  // Submit Tax Day cards
+  socket.on('submitTaxDayCards', ({ cardIds }) => {
+    if (!currentRoom) return;
+
+    const game = games.get(currentRoom);
+    if (!game) return;
+
+    const player = game.getPlayer(socket.id);
+    const result = game.submitTaxDayCards(socket.id, cardIds);
+
+    if (result.success) {
+      io.to(currentRoom).emit('taxDaySubmitted', {
+        playerName: player.name,
+        playerId: socket.id
+      });
+
+      if (result.allSubmitted) {
+        // Complete tax day and redistribute
+        game.completeTaxDay();
+
+        // Update all players
+        game.players.forEach(p => {
+          io.to(p.id).emit('taxDayCompleted', {
+            gameState: game.getGameState(p.id)
+          });
+        });
+
+        io.to(currentRoom).emit('notification', {
+          message: 'Tax Day completed! Cards redistributed.'
+        });
+      }
     } else {
       socket.emit('error', { message: result.message });
     }

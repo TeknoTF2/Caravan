@@ -12,6 +12,7 @@ class Game {
     this.roundNumber = 1;
     this.vaultPhaseComplete = {};
     this.winner = null;
+    this.taxDayState = null; // { active: true, discards: {playerId: [cards]}, submitted: [playerIds] }
   }
 
   addPlayer(playerId, playerName) {
@@ -218,6 +219,78 @@ class Game {
     return { newRound: false };
   }
 
+  // Tax Day methods
+  startTaxDay() {
+    this.taxDayState = {
+      active: true,
+      discards: {},
+      submitted: []
+    };
+    return { success: true };
+  }
+
+  submitTaxDayCards(playerId, cardIds) {
+    if (!this.taxDayState || !this.taxDayState.active) {
+      return { success: false, message: 'Tax Day not active' };
+    }
+
+    if (this.taxDayState.submitted.includes(playerId)) {
+      return { success: false, message: 'Already submitted' };
+    }
+
+    const player = this.getPlayer(playerId);
+    if (!player) return { success: false, message: 'Player not found' };
+
+    // Remove cards from hand
+    const cards = [];
+    for (const cardId of cardIds) {
+      const idx = player.hand.findIndex(c => c.id === cardId);
+      if (idx !== -1) {
+        cards.push(player.hand.splice(idx, 1)[0]);
+      }
+    }
+
+    this.taxDayState.discards[playerId] = cards;
+    this.taxDayState.submitted.push(playerId);
+
+    // Check if all players have submitted
+    const allSubmitted = this.players.every(p => this.taxDayState.submitted.includes(p.id));
+
+    return { success: true, allSubmitted };
+  }
+
+  completeTaxDay() {
+    if (!this.taxDayState || !this.taxDayState.active) {
+      return { success: false, message: 'Tax Day not active' };
+    }
+
+    // Collect all discarded cards
+    const allCards = [];
+    for (const cards of Object.values(this.taxDayState.discards)) {
+      allCards.push(...cards);
+    }
+
+    // Shuffle cards
+    const shuffled = shuffleDeck(allCards);
+
+    // Redistribute evenly
+    const cardsPerPlayer = Math.floor(shuffled.length / this.players.length);
+    const remainder = shuffled.length % this.players.length;
+
+    let cardIndex = 0;
+    this.players.forEach((player, i) => {
+      const numCards = cardsPerPlayer + (i < remainder ? 1 : 0);
+      for (let j = 0; j < numCards; j++) {
+        player.hand.push(shuffled[cardIndex++]);
+      }
+    });
+
+    // Reset tax day state
+    this.taxDayState = null;
+
+    return { success: true };
+  }
+
   getGameState(forPlayerId = null) {
     return {
       roomId: this.roomId,
@@ -238,7 +311,8 @@ class Game {
         vault: forPlayerId === p.id ? p.vault : null,
         vaultCaravanType: forPlayerId === p.id ? p.vaultCaravanType : null
       })),
-      winner: this.winner
+      winner: this.winner,
+      taxDayActive: this.taxDayState?.active || false
     };
   }
 }
