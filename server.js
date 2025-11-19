@@ -171,7 +171,7 @@ io.on('connection', (socket) => {
   });
 
   // Play action card
-  socket.on('playAction', ({ cardId, targetPlayerId, data }) => {
+  socket.on('playAction', ({ cardId, targetPlayerId, actionType, data }) => {
     if (!currentRoom) return;
 
     const game = games.get(currentRoom);
@@ -201,11 +201,87 @@ io.on('connection', (socket) => {
     player.hand.splice(cardIndex, 1);
     game.discardPile.push(card);
 
-    // Emit action event for client-side handling
+    // Execute action based on type
+    switch (actionType) {
+      case 'thief':
+        const targetPlayer = game.getPlayer(targetPlayerId);
+        if (targetPlayer && targetPlayer.hand.length > 0) {
+          const randomIndex = Math.floor(Math.random() * targetPlayer.hand.length);
+          const stolenCard = targetPlayer.hand.splice(randomIndex, 1)[0];
+          player.hand.push(stolenCard);
+
+          io.to(targetPlayerId).emit('cardStolen', {
+            byPlayer: player.name,
+            cardId: stolenCard.id
+          });
+
+          socket.emit('cardReceived', {
+            card: stolenCard,
+            fromPlayer: targetPlayer.name
+          });
+        }
+        break;
+
+      case 'fire':
+        io.to(targetPlayerId).emit('mustDiscard', {
+          count: 2,
+          reason: 'Fire card played by ' + player.name
+        });
+        break;
+
+      case 'smuggler':
+        const drawnCards = game.drawCards(3);
+        player.hand.push(...drawnCards);
+        socket.emit('smugglerDrawn', {
+          cards: drawnCards,
+          mustDiscard: 1
+        });
+        break;
+
+      case 'audit':
+        const auditTarget = game.getPlayer(targetPlayerId);
+        if (auditTarget) {
+          socket.emit('auditResult', {
+            targetPlayer: auditTarget.name,
+            hand: auditTarget.hand
+          });
+        }
+        break;
+
+      case 'fence':
+        if (data && data.vaultCardId && data.handCardId) {
+          const vaultIdx = player.vault.findIndex(c => c.id === data.vaultCardId);
+          const handIdx = player.hand.findIndex(c => c.id === data.handCardId);
+
+          if (vaultIdx !== -1 && handIdx !== -1) {
+            const [vaultCard] = player.vault.splice(vaultIdx, 1);
+            const [handCard] = player.hand.splice(handIdx, 1);
+
+            player.hand.push(vaultCard);
+            player.vault.push(handCard);
+          }
+        }
+        break;
+
+      case 'taxDay':
+        io.to(currentRoom).emit('taxDayStarted', {
+          initiator: player.name
+        });
+        break;
+
+      case 'marketDay':
+        io.to(currentRoom).emit('marketDayStarted', {
+          initiator: player.name
+        });
+        break;
+    }
+
+    // Notify all players
     io.to(currentRoom).emit('actionPlayed', {
       playerId: socket.id,
       playerName: player.name,
       card,
+      actionType,
       targetPlayerId,
       data
     });
