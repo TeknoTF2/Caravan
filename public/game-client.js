@@ -160,6 +160,9 @@ socket.on('gameStateUpdate', (data) => {
 function updateGameUI() {
     if (!gameState) return;
 
+    // Clear selections FIRST to prevent soft-locks
+    selectedCards = [];
+
     // Update header
     document.getElementById('round-number').textContent = gameState.roundNumber;
     document.getElementById('current-phase').textContent = gameState.phase.toUpperCase();
@@ -181,9 +184,6 @@ function updateGameUI() {
 
     // Update action panel based on phase
     updateActionPanel();
-
-    // Clear selections
-    selectedCards = [];
 }
 
 // Update other players display
@@ -287,10 +287,10 @@ function updateActionPanel() {
     const isMyTurn = gameState.currentPlayerId === currentPlayerId;
 
     if (gameState.phase === 'vault') {
-        // Vault phase buttons
+        // Vault phase buttons - always available
         const addBtn = createButton('Add to Vault', () => handleVaultAdd());
         const removeBtn = createButton('Remove from Vault', () => handleVaultRemove());
-        const completeBtn = createButton('Complete Vault Phase', () => socket.emit('completeVaultPhase'));
+        const completeBtn = createButton('Complete Vault Phase', () => handleCompleteVaultPhase());
         const declareBtn = createButton('Declare Victory!', () => socket.emit('declareVictory'), 'secondary');
 
         panel.appendChild(addBtn);
@@ -311,11 +311,23 @@ function updateActionPanel() {
             panel.appendChild(discardBtn);
             panel.appendChild(endTurnBtn);
         } else {
+            // Not your turn - but you can still respond to actions
             const waitMsg = document.createElement('p');
-            waitMsg.textContent = 'Waiting for other players...';
+            waitMsg.textContent = 'Waiting for current player...';
             waitMsg.style.color = 'var(--tavern-gold)';
             waitMsg.style.textAlign = 'center';
+            waitMsg.style.marginBottom = '0.5rem';
             panel.appendChild(waitMsg);
+
+            // During Market Day, allow everyone to propose trades (for bidding)
+            if (gameState.marketDayActive) {
+                const tradeBtn = createButton('Propose Trade (Market Day)', () => handleTrade());
+                panel.appendChild(tradeBtn);
+            }
+
+            // Add a discard button that's always available for responding to Fire, etc.
+            const discardBtn = createButton('Discard Cards (if prompted)', () => handleDiscard());
+            panel.appendChild(discardBtn);
         }
     }
 }
@@ -327,6 +339,18 @@ function createButton(text, onClick, className = '') {
     btn.textContent = text;
     btn.onclick = onClick;
     return btn;
+}
+
+// Handle complete vault phase
+function handleCompleteVaultPhase() {
+    // Clear any lingering selections
+    selectedCards = [];
+    document.querySelectorAll('.card.selected').forEach(el => {
+        el.classList.remove('selected');
+    });
+
+    socket.emit('completeVaultPhase');
+    showToast('Waiting for other players to complete vault phase...');
 }
 
 // Handle vault add
@@ -341,12 +365,20 @@ function handleVaultAdd() {
         return;
     }
 
+    const cardIds = selectedCards.map(c => c.id);
+
     socket.emit('vaultAction', {
         action: 'add',
-        cardIds: selectedCards.map(c => c.id)
+        cardIds: cardIds
     });
 
+    // Clear selections immediately
     selectedCards = [];
+
+    // Clear visual selections
+    document.querySelectorAll('.card.selected').forEach(el => {
+        el.classList.remove('selected');
+    });
 }
 
 // Handle vault remove
@@ -361,19 +393,33 @@ function handleVaultRemove() {
         return;
     }
 
+    const cardIds = selectedCards.map(c => c.id);
+
     socket.emit('vaultAction', {
         action: 'remove',
-        cardIds: selectedCards.map(c => c.id)
+        cardIds: cardIds
     });
 
+    // Clear selections immediately
     selectedCards = [];
+
+    // Clear visual selections
+    document.querySelectorAll('.card.selected').forEach(el => {
+        el.classList.remove('selected');
+    });
 }
 
 // Socket event: Vault updated
 socket.on('vaultUpdated', (data) => {
     gameState = data.gameState;
+    selectedCards = []; // Ensure selections are cleared
     updateGameUI();
     showToast('Vault updated');
+
+    // Force re-render to prevent soft-lock
+    setTimeout(() => {
+        updateActionPanel();
+    }, 100);
 });
 
 // Socket event: Cards drawn
@@ -538,7 +584,7 @@ function handleMarketDayCard(card) {
     showModal(
         'Playing Market Day',
         `<p>All players will simultaneously reveal 1 card from their hand.</p>
-         <p>Cards will be auctioned one at a time.</p>
+         <p>Cards will be displayed, then players can bid via trades.</p>
          <p><strong>Select 1 card from your hand to reveal</strong></p>`,
         () => {
             if (selectedCards.length !== 1) {
@@ -546,13 +592,18 @@ function handleMarketDayCard(card) {
                 return;
             }
 
+            const revealedCardId = selectedCards[0].id;
+
+            // First, play the action card
             socket.emit('playAction', {
                 cardId: card.id,
                 actionType: 'marketDay',
                 data: {
-                    revealedCardId: selectedCards[0].id
+                    revealedCardId: revealedCardId
                 }
             });
+
+            // The card was already submitted via the action
             selectedCards = [];
         },
         () => selectedCards = []
@@ -572,12 +623,15 @@ function handleTaxDayCard(card) {
                 return;
             }
 
+            // First, play the action card
             socket.emit('playAction', {
                 cardId: card.id,
-                actionType: 'taxDay',
-                data: {
-                    discardedCardIds: selectedCards.map(c => c.id)
-                }
+                actionType: 'taxDay'
+            });
+
+            // Then immediately submit your cards
+            socket.emit('submitTaxDayCards', {
+                cardIds: selectedCards.map(c => c.id)
             });
             selectedCards = [];
         },
@@ -693,12 +747,119 @@ socket.on('auditResult', (data) => {
 
 // Socket event: Tax Day started
 socket.on('taxDayStarted', (data) => {
-    showToast(`${data.initiator} played Tax Day! (Note: Manual implementation - all players discard 2 cards)`);
+    // Only show modal if you're not the initiator (they already submitted)
+    if (data.initiator !== gameState.players.find(p => p.id === currentPlayerId)?.name) {
+        showModal(
+            'Tax Day!',
+            `<p>${data.initiator} played Tax Day!</p>
+             <p>All players must discard 2 cards.</p>
+             <p><strong>Select 2 cards from your hand to discard</strong></p>`,
+            () => {
+                if (selectedCards.length !== 2) {
+                    showToast('Select exactly 2 cards to discard');
+                    return;
+                }
+
+                socket.emit('submitTaxDayCards', {
+                    cardIds: selectedCards.map(c => c.id)
+                });
+                selectedCards = [];
+                showToast('Submitted! Waiting for other players...');
+            }
+        );
+    }
+});
+
+// Socket event: Tax Day submitted by a player
+socket.on('taxDaySubmitted', (data) => {
+    if (data.playerId !== currentPlayerId) {
+        showToast(`${data.playerName} submitted their cards`);
+    }
+});
+
+// Socket event: Tax Day completed
+socket.on('taxDayCompleted', (data) => {
+    gameState = data.gameState;
+    updateGameUI();
+    showToast('Tax Day completed! Cards redistributed.');
 });
 
 // Socket event: Market Day started
 socket.on('marketDayStarted', (data) => {
-    showToast(`${data.initiator} played Market Day! (Note: Manual implementation - reveal and auction cards)`);
+    // Only show modal if you're not the initiator (they already submitted)
+    if (data.initiatorId !== currentPlayerId) {
+        showModal(
+            'Market Day!',
+            `<p>${data.initiator} played Market Day!</p>
+             <p>All players must reveal 1 card from their hand.</p>
+             <p><strong>Select 1 card from your hand to reveal</strong></p>`,
+            () => {
+                if (selectedCards.length !== 1) {
+                    showToast('Select exactly 1 card to reveal');
+                    return;
+                }
+
+                socket.emit('submitMarketDayCard', {
+                    cardId: selectedCards[0].id
+                });
+                selectedCards = [];
+                showToast('Submitted! Waiting for other players...');
+            }
+        );
+    } else {
+        showToast('Market Day started! Waiting for other players to reveal cards...');
+    }
+});
+
+// Socket event: Market Day submitted by a player
+socket.on('marketDaySubmitted', (data) => {
+    if (data.playerId !== currentPlayerId) {
+        showToast(`${data.playerName} revealed their card`);
+    }
+});
+
+// Socket event: Market Day cards revealed
+socket.on('marketDayRevealed', (data) => {
+    gameState = data.gameState;
+    updateGameUI();
+
+    // Display all revealed cards
+    let cardsHTML = '<div style="margin-bottom: 1rem;"><p><strong>Revealed Cards:</strong></p></div>';
+    cardsHTML += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.5rem;">';
+
+    data.revealedCards.forEach(reveal => {
+        const card = reveal.card;
+        const cardClass = card.type === 'commodity' ? `commodity ${card.caravanType}` : 'action';
+
+        cardsHTML += `
+            <div style="text-align: center;">
+                <div class="card ${cardClass}" style="width: 100px; height: 140px; margin: 0 auto;">
+                    <div class="card-name">${card.name}</div>`;
+
+        if (card.type === 'commodity') {
+            cardsHTML += `
+                    <div class="card-value">${card.value}g</div>
+                    <div class="card-type">${card.caravanType.replace('_', ' ')}</div>`;
+        } else {
+            cardsHTML += `<div class="card-description" style="font-size: 0.4rem;">${card.description}</div>`;
+        }
+
+        cardsHTML += `
+                </div>
+                <div style="font-size: 0.8rem; margin-top: 0.25rem;">${reveal.playerName}</div>
+            </div>`;
+    });
+
+    cardsHTML += '</div>';
+    cardsHTML += '<p style="margin-top: 1rem; color: var(--tavern-gold);">Use "Propose Trade" to bid on cards. Highest bidder wins each card. Unbid cards return to owners.</p>';
+
+    showModal(
+        'Market Day - Cards Revealed!',
+        cardsHTML,
+        () => {
+            showToast('Market Day active - use trades to bid on cards!');
+        }
+    );
 });
 
 // Handle trade
@@ -842,4 +1003,9 @@ socket.on('playerDiscarded', (data) => {
             showToast(`${player.name} discarded ${data.count} card(s)`);
         }
     }
+});
+
+// Socket event: General notification
+socket.on('notification', (data) => {
+    showToast(data.message);
 });
