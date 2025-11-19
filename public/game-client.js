@@ -9,6 +9,10 @@ let currentRoomId = null;
 let gameState = null;
 let selectedCards = [];
 let pendingAction = null;
+let awaitingTaxDay = false;
+let awaitingMarketDay = false;
+let awaitingFire = false;
+let awaitingTradeResponse = null;
 
 // DOM Elements
 const screens = {
@@ -319,15 +323,123 @@ function updateActionPanel() {
             waitMsg.style.marginBottom = '0.5rem';
             panel.appendChild(waitMsg);
 
+            // Tax Day response
+            if (awaitingTaxDay) {
+                const taxInfo = document.createElement('p');
+                taxInfo.textContent = '⚠️ Tax Day: Select 2 cards to discard';
+                taxInfo.style.color = '#ff6b6b';
+                taxInfo.style.fontWeight = 'bold';
+                taxInfo.style.textAlign = 'center';
+                panel.appendChild(taxInfo);
+
+                const submitBtn = createButton('Submit Tax Day Cards', () => {
+                    if (selectedCards.length !== 2) {
+                        showToast('Select exactly 2 cards to discard');
+                        return;
+                    }
+                    socket.emit('submitTaxDayCards', {
+                        cardIds: selectedCards.map(c => c.id)
+                    });
+                    selectedCards = [];
+                    awaitingTaxDay = false;
+                    updateActionPanel();
+                });
+                panel.appendChild(submitBtn);
+            }
+
+            // Market Day response
+            if (awaitingMarketDay) {
+                const marketInfo = document.createElement('p');
+                marketInfo.textContent = '⚠️ Market Day: Select 1 card to reveal';
+                marketInfo.style.color = '#ffd700';
+                marketInfo.style.fontWeight = 'bold';
+                marketInfo.style.textAlign = 'center';
+                panel.appendChild(marketInfo);
+
+                const submitBtn = createButton('Submit Market Day Card', () => {
+                    if (selectedCards.length !== 1) {
+                        showToast('Select exactly 1 card to reveal');
+                        return;
+                    }
+                    socket.emit('submitMarketDayCard', {
+                        cardId: selectedCards[0].id
+                    });
+                    selectedCards = [];
+                    awaitingMarketDay = false;
+                    updateActionPanel();
+                });
+                panel.appendChild(submitBtn);
+            }
+
+            // Fire response
+            if (awaitingFire) {
+                const fireInfo = document.createElement('p');
+                fireInfo.textContent = '⚠️ Fire: Select 2 cards to discard';
+                fireInfo.style.color = '#ff4500';
+                fireInfo.style.fontWeight = 'bold';
+                fireInfo.style.textAlign = 'center';
+                panel.appendChild(fireInfo);
+
+                const submitBtn = createButton('Discard Cards', () => {
+                    if (selectedCards.length !== 2) {
+                        showToast('Select exactly 2 cards to discard');
+                        return;
+                    }
+                    socket.emit('discardCards', {
+                        cardIds: selectedCards.map(c => c.id)
+                    });
+                    selectedCards = [];
+                    awaitingFire = false;
+                    updateActionPanel();
+                });
+                panel.appendChild(submitBtn);
+            }
+
+            // Trade response
+            if (awaitingTradeResponse) {
+                const tradeInfo = document.createElement('p');
+                tradeInfo.textContent = `⚠️ Trade from ${awaitingTradeResponse.fromPlayerName}: Select ${awaitingTradeResponse.requestedCardIds.length} card(s)`;
+                tradeInfo.style.color = '#4CAF50';
+                tradeInfo.style.fontWeight = 'bold';
+                tradeInfo.style.textAlign = 'center';
+                panel.appendChild(tradeInfo);
+
+                const acceptBtn = createButton('Accept Trade', () => {
+                    if (selectedCards.length !== awaitingTradeResponse.requestedCardIds.length) {
+                        showToast(`Select exactly ${awaitingTradeResponse.requestedCardIds.length} card(s)`);
+                        return;
+                    }
+                    socket.emit('acceptTrade', {
+                        fromPlayerId: awaitingTradeResponse.fromPlayerId,
+                        offeredCardIds: awaitingTradeResponse.offeredCardIds,
+                        requestedCardIds: selectedCards.map(c => c.id)
+                    });
+                    selectedCards = [];
+                    awaitingTradeResponse = null;
+                    updateActionPanel();
+                });
+                panel.appendChild(acceptBtn);
+
+                const declineBtn = createButton('Decline Trade', () => {
+                    selectedCards = [];
+                    awaitingTradeResponse = null;
+                    showToast('Trade declined');
+                    updateActionPanel();
+                }, 'secondary');
+                panel.appendChild(declineBtn);
+            }
+
             // During Market Day, allow everyone to propose trades (for bidding)
-            if (gameState.marketDayActive) {
+            if (gameState.marketDayActive && !awaitingMarketDay) {
                 const tradeBtn = createButton('Propose Trade (Market Day)', () => handleTrade());
                 panel.appendChild(tradeBtn);
             }
 
-            // Add a discard button that's always available for responding to Fire, etc.
-            const discardBtn = createButton('Discard Cards (if prompted)', () => handleDiscard());
-            panel.appendChild(discardBtn);
+            // General discard button (for other situations)
+            if (!awaitingTaxDay && !awaitingFire && !awaitingTradeResponse) {
+                const discardBtn = createButton('Discard Cards', () => handleDiscard());
+                panel.appendChild(discardBtn);
+            }
         }
     }
 }
@@ -677,21 +789,9 @@ socket.on('cardReceived', (data) => {
 
 // Socket event: Must discard (Fire victim)
 socket.on('mustDiscard', (data) => {
-    showModal(
-        'Fire Card Effect',
-        `<p>${data.reason}</p><p>Select ${data.count} cards to discard</p>`,
-        () => {
-            if (selectedCards.length !== data.count) {
-                showToast(`Select exactly ${data.count} cards`);
-                return;
-            }
-
-            socket.emit('discardCards', {
-                cardIds: selectedCards.map(c => c.id)
-            });
-            selectedCards = [];
-        }
-    );
+    awaitingFire = true;
+    showToast(data.reason + ' - Select 2 cards to discard');
+    updateActionPanel();
 });
 
 // Socket event: Smuggler drawn cards
@@ -747,32 +847,21 @@ socket.on('auditResult', (data) => {
 
 // Socket event: Tax Day started
 socket.on('taxDayStarted', (data) => {
-    // Only show modal if you're not the initiator (they already submitted)
+    // Only set flag if you're not the initiator (they already submitted)
     if (data.initiator !== gameState.players.find(p => p.id === currentPlayerId)?.name) {
-        showModal(
-            'Tax Day!',
-            `<p>${data.initiator} played Tax Day!</p>
-             <p>All players must discard 2 cards.</p>
-             <p><strong>Select 2 cards from your hand to discard</strong></p>`,
-            () => {
-                if (selectedCards.length !== 2) {
-                    showToast('Select exactly 2 cards to discard');
-                    return;
-                }
-
-                socket.emit('submitTaxDayCards', {
-                    cardIds: selectedCards.map(c => c.id)
-                });
-                selectedCards = [];
-                showToast('Submitted! Waiting for other players...');
-            }
-        );
+        awaitingTaxDay = true;
+        showToast(`${data.initiator} played Tax Day! Select 2 cards to discard`);
+        updateActionPanel();
     }
 });
 
 // Socket event: Tax Day submitted by a player
 socket.on('taxDaySubmitted', (data) => {
-    if (data.playerId !== currentPlayerId) {
+    if (data.playerId === currentPlayerId) {
+        awaitingTaxDay = false; // Clear the flag when we submit
+        showToast('Submitted! Waiting for other players...');
+        updateActionPanel();
+    } else {
         showToast(`${data.playerName} submitted their cards`);
     }
 });
@@ -786,26 +875,11 @@ socket.on('taxDayCompleted', (data) => {
 
 // Socket event: Market Day started
 socket.on('marketDayStarted', (data) => {
-    // Only show modal if you're not the initiator (they already submitted)
+    // Only set flag if you're not the initiator (they already submitted)
     if (data.initiatorId !== currentPlayerId) {
-        showModal(
-            'Market Day!',
-            `<p>${data.initiator} played Market Day!</p>
-             <p>All players must reveal 1 card from their hand.</p>
-             <p><strong>Select 1 card from your hand to reveal</strong></p>`,
-            () => {
-                if (selectedCards.length !== 1) {
-                    showToast('Select exactly 1 card to reveal');
-                    return;
-                }
-
-                socket.emit('submitMarketDayCard', {
-                    cardId: selectedCards[0].id
-                });
-                selectedCards = [];
-                showToast('Submitted! Waiting for other players...');
-            }
-        );
+        awaitingMarketDay = true;
+        showToast(`${data.initiator} played Market Day! Select 1 card to reveal`);
+        updateActionPanel();
     } else {
         showToast('Market Day started! Waiting for other players to reveal cards...');
     }
@@ -813,7 +887,11 @@ socket.on('marketDayStarted', (data) => {
 
 // Socket event: Market Day submitted by a player
 socket.on('marketDaySubmitted', (data) => {
-    if (data.playerId !== currentPlayerId) {
+    if (data.playerId === currentPlayerId) {
+        awaitingMarketDay = false; // Clear the flag when we submit
+        showToast('Submitted! Waiting for other players...');
+        updateActionPanel();
+    } else {
         showToast(`${data.playerName} revealed their card`);
     }
 });
@@ -892,36 +970,15 @@ function handleTrade() {
 
 // Socket event: Trade proposed
 socket.on('tradeProposed', (data) => {
-    showModal(
-        'Trade Offer',
-        `<p>${data.fromPlayerName} wants to trade!</p>
-        <p>They offer: ${data.offeredCardIds.length} card(s)</p>
-        <p>They request: ${data.requestedCardIds.length} card(s)</p>
-        <p>Select ${data.requestedCardIds.length} card(s) from your hand to trade</p>`,
-        () => {
-            if (selectedCards.length !== data.requestedCardIds.length) {
-                showToast(`Select exactly ${data.requestedCardIds.length} card(s)`);
-                return;
-            }
-
-            socket.emit('acceptTrade', {
-                fromPlayerId: data.fromPlayerId,
-                offeredCardIds: data.offeredCardIds,
-                requestedCardIds: selectedCards.map(c => c.id)
-            });
-
-            selectedCards = [];
-        },
-        () => {
-            selectedCards = [];
-            showToast('Trade declined');
-        }
-    );
+    awaitingTradeResponse = data;
+    showToast(`${data.fromPlayerName} wants to trade ${data.offeredCardIds.length} for ${data.requestedCardIds.length} cards`);
+    updateActionPanel();
 });
 
 // Socket event: Trade completed
 socket.on('tradeCompleted', (data) => {
     gameState = data.gameState;
+    awaitingTradeResponse = null; // Clear trade state
     updateGameUI();
     showToast('Trade completed!');
 });
