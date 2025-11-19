@@ -319,6 +319,12 @@ function updateActionPanel() {
             waitMsg.style.marginBottom = '0.5rem';
             panel.appendChild(waitMsg);
 
+            // During Market Day, allow everyone to propose trades (for bidding)
+            if (gameState.marketDayActive) {
+                const tradeBtn = createButton('Propose Trade (Market Day)', () => handleTrade());
+                panel.appendChild(tradeBtn);
+            }
+
             // Add a discard button that's always available for responding to Fire, etc.
             const discardBtn = createButton('Discard Cards (if prompted)', () => handleDiscard());
             panel.appendChild(discardBtn);
@@ -578,7 +584,7 @@ function handleMarketDayCard(card) {
     showModal(
         'Playing Market Day',
         `<p>All players will simultaneously reveal 1 card from their hand.</p>
-         <p>Cards will be auctioned one at a time.</p>
+         <p>Cards will be displayed, then players can bid via trades.</p>
          <p><strong>Select 1 card from your hand to reveal</strong></p>`,
         () => {
             if (selectedCards.length !== 1) {
@@ -586,13 +592,18 @@ function handleMarketDayCard(card) {
                 return;
             }
 
+            const revealedCardId = selectedCards[0].id;
+
+            // First, play the action card
             socket.emit('playAction', {
                 cardId: card.id,
                 actionType: 'marketDay',
                 data: {
-                    revealedCardId: selectedCards[0].id
+                    revealedCardId: revealedCardId
                 }
             });
+
+            // The card was already submitted via the action
             selectedCards = [];
         },
         () => selectedCards = []
@@ -775,7 +786,80 @@ socket.on('taxDayCompleted', (data) => {
 
 // Socket event: Market Day started
 socket.on('marketDayStarted', (data) => {
-    showToast(`${data.initiator} played Market Day! (Note: Manual implementation - reveal and auction cards)`);
+    // Only show modal if you're not the initiator (they already submitted)
+    if (data.initiatorId !== currentPlayerId) {
+        showModal(
+            'Market Day!',
+            `<p>${data.initiator} played Market Day!</p>
+             <p>All players must reveal 1 card from their hand.</p>
+             <p><strong>Select 1 card from your hand to reveal</strong></p>`,
+            () => {
+                if (selectedCards.length !== 1) {
+                    showToast('Select exactly 1 card to reveal');
+                    return;
+                }
+
+                socket.emit('submitMarketDayCard', {
+                    cardId: selectedCards[0].id
+                });
+                selectedCards = [];
+                showToast('Submitted! Waiting for other players...');
+            }
+        );
+    } else {
+        showToast('Market Day started! Waiting for other players to reveal cards...');
+    }
+});
+
+// Socket event: Market Day submitted by a player
+socket.on('marketDaySubmitted', (data) => {
+    if (data.playerId !== currentPlayerId) {
+        showToast(`${data.playerName} revealed their card`);
+    }
+});
+
+// Socket event: Market Day cards revealed
+socket.on('marketDayRevealed', (data) => {
+    gameState = data.gameState;
+    updateGameUI();
+
+    // Display all revealed cards
+    let cardsHTML = '<div style="margin-bottom: 1rem;"><p><strong>Revealed Cards:</strong></p></div>';
+    cardsHTML += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.5rem;">';
+
+    data.revealedCards.forEach(reveal => {
+        const card = reveal.card;
+        const cardClass = card.type === 'commodity' ? `commodity ${card.caravanType}` : 'action';
+
+        cardsHTML += `
+            <div style="text-align: center;">
+                <div class="card ${cardClass}" style="width: 100px; height: 140px; margin: 0 auto;">
+                    <div class="card-name">${card.name}</div>`;
+
+        if (card.type === 'commodity') {
+            cardsHTML += `
+                    <div class="card-value">${card.value}g</div>
+                    <div class="card-type">${card.caravanType.replace('_', ' ')}</div>`;
+        } else {
+            cardsHTML += `<div class="card-description" style="font-size: 0.4rem;">${card.description}</div>`;
+        }
+
+        cardsHTML += `
+                </div>
+                <div style="font-size: 0.8rem; margin-top: 0.25rem;">${reveal.playerName}</div>
+            </div>`;
+    });
+
+    cardsHTML += '</div>';
+    cardsHTML += '<p style="margin-top: 1rem; color: var(--tavern-gold);">Use "Propose Trade" to bid on cards. Highest bidder wins each card. Unbid cards return to owners.</p>';
+
+    showModal(
+        'Market Day - Cards Revealed!',
+        cardsHTML,
+        () => {
+            showToast('Market Day active - use trades to bid on cards!');
+        }
+    );
 });
 
 // Handle trade

@@ -13,6 +13,7 @@ class Game {
     this.vaultPhaseComplete = {};
     this.winner = null;
     this.taxDayState = null; // { active: true, discards: {playerId: [cards]}, submitted: [playerIds] }
+    this.marketDayState = null; // { active: true, reveals: {playerId: card}, submitted: [playerIds], currentAuction: cardIndex, bids: {playerId: [cards]} }
   }
 
   addPlayer(playerId, playerName) {
@@ -291,6 +292,67 @@ class Game {
     return { success: true };
   }
 
+  // Market Day methods
+  startMarketDay() {
+    this.marketDayState = {
+      active: true,
+      reveals: {},
+      submitted: [],
+      auctionComplete: false
+    };
+    return { success: true };
+  }
+
+  submitMarketDayCard(playerId, cardId) {
+    if (!this.marketDayState || !this.marketDayState.active) {
+      return { success: false, message: 'Market Day not active' };
+    }
+
+    if (this.marketDayState.submitted.includes(playerId)) {
+      return { success: false, message: 'Already submitted' };
+    }
+
+    const player = this.getPlayer(playerId);
+    if (!player) return { success: false, message: 'Player not found' };
+
+    const cardIndex = player.hand.findIndex(c => c.id === cardId);
+    if (cardIndex === -1) {
+      return { success: false, message: 'Card not found' };
+    }
+
+    const card = player.hand.splice(cardIndex, 1)[0];
+    this.marketDayState.reveals[playerId] = card;
+    this.marketDayState.submitted.push(playerId);
+
+    const allSubmitted = this.players.every(p => this.marketDayState.submitted.includes(p.id));
+
+    return { success: true, allSubmitted };
+  }
+
+  completeMarketDay() {
+    if (!this.marketDayState || !this.marketDayState.active) {
+      return { success: false, message: 'Market Day not active' };
+    }
+
+    // Return all revealed cards to their owners
+    for (const [playerId, card] of Object.entries(this.marketDayState.reveals)) {
+      const player = this.getPlayer(playerId);
+      if (player) {
+        player.hand.push(card);
+      }
+    }
+
+    const revealedCards = Object.entries(this.marketDayState.reveals).map(([playerId, card]) => ({
+      playerId,
+      playerName: this.getPlayer(playerId)?.name,
+      card
+    }));
+
+    this.marketDayState = null;
+
+    return { success: true, revealedCards };
+  }
+
   getGameState(forPlayerId = null) {
     return {
       roomId: this.roomId,
@@ -312,7 +374,8 @@ class Game {
         vaultCaravanType: forPlayerId === p.id ? p.vaultCaravanType : null
       })),
       winner: this.winner,
-      taxDayActive: this.taxDayState?.active || false
+      taxDayActive: this.taxDayState?.active || false,
+      marketDayActive: this.marketDayState?.active || false
     };
   }
 }

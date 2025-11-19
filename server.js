@@ -271,8 +271,14 @@ io.on('connection', (socket) => {
         break;
 
       case 'marketDay':
+        game.startMarketDay();
+        // Submit initiator's card immediately if provided
+        if (data && data.revealedCardId) {
+          game.submitMarketDayCard(socket.id, data.revealedCardId);
+        }
         io.to(currentRoom).emit('marketDayStarted', {
-          initiator: player.name
+          initiator: player.name,
+          initiatorId: socket.id
         });
         break;
     }
@@ -347,6 +353,43 @@ io.on('connection', (socket) => {
 
         io.to(currentRoom).emit('notification', {
           message: 'Tax Day completed! Cards redistributed.'
+        });
+      }
+    } else {
+      socket.emit('error', { message: result.message });
+    }
+  });
+
+  // Submit Market Day card
+  socket.on('submitMarketDayCard', ({ cardId }) => {
+    if (!currentRoom) return;
+
+    const game = games.get(currentRoom);
+    if (!game) return;
+
+    const player = game.getPlayer(socket.id);
+    const result = game.submitMarketDayCard(socket.id, cardId);
+
+    if (result.success) {
+      io.to(currentRoom).emit('marketDaySubmitted', {
+        playerName: player.name,
+        playerId: socket.id
+      });
+
+      if (result.allSubmitted) {
+        // All cards revealed, complete market day
+        const completeResult = game.completeMarketDay();
+
+        // Update all players
+        game.players.forEach(p => {
+          io.to(p.id).emit('marketDayRevealed', {
+            gameState: game.getGameState(p.id),
+            revealedCards: completeResult.revealedCards
+          });
+        });
+
+        io.to(currentRoom).emit('notification', {
+          message: 'Market Day: All cards revealed! Players may now bid via trades.'
         });
       }
     } else {
